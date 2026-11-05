@@ -9,15 +9,20 @@ bot = telebot.TeleBot(TOKEN)
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "هلا بيك يا حسين! 🛠️ بوت الإنلاين مود صار يدعم نتائج بحث واسعة وضخمة تصل إلى 50 نتيجة بالبحث الواحد. اكتب اسم البوت بأي محادثة وابحث فوري!")
+    bot.reply_to(message, "هلا بيك يا حسين! 🛠️ البوت متصل ومحدث وجاهز للبحث الموصول والتحميل السريع.")
 
 # استقبال الروابط (فيديو أو قائمة تشغيل Playlist) مباشرة
 @bot.message_handler(func=lambda message: message.text and message.text.startswith('http'))
 def handle_urls(message):
     url = message.text
-    msg = bot.reply_to(message, "🔍 ديصير فحص الرابط وجلب التفاصيل...")
+    msg = bot.reply_to(message, "🔍 جاي أفحص الرابط وأجلب التفاصيل...")
     
-    ydl_opts = {'extract_flat': True}
+    ydl_opts = {
+        'extract_flat': True,
+        'quiet': True,
+        'no_warnings': True,
+        'geo_bypass': True
+    }
     try:
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -25,9 +30,9 @@ def handle_urls(message):
         if 'entries' in info:
             playlist_title = info.get('title', 'قائمة تشغيل')
             entries = info.get('entries', [])
-            text = f"📂 **قائمة تشغيل:** {playlist_title}\nعدد الفيديوهات الكلي: {len(entries)}\n\nاختر الفيديو للتحميل:"
+            text = f"📂 **قائمة تشغيل:** {playlist_title}\nعدد الفيديوهات: {len(entries)}\n\nاختر الفيديو للتحميل:"
             markup = InlineKeyboardMarkup()
-            for i, entry in enumerate(entries[:50]): # عرض لحد 50 فيديو من البلاي ليست
+            for i, entry in enumerate(entries[:50]):
                 vid_id = entry.get('id')
                 title = entry.get('title', f'فيديو {i+1}')
                 if vid_id:
@@ -50,7 +55,11 @@ def get_video_qualities_callback(call):
 
 def show_qualities_by_id(chat_id, message_id, url):
     bot.edit_message_text("⚙️ جاي أجلب الجودات المتاحة...", chat_id, message_id)
-    ydl_opts = {'extract_flat': True}
+    ydl_opts = {
+        'extract_flat': True,
+        'quiet': True,
+        'geo_bypass': True
+    }
     try:
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -95,7 +104,9 @@ def download_selected_quality(call):
     ydl_opts = {
         'format': f'{format_id}+bestaudio/best',
         'outtmpl': output_template,
-        'merge_output_format': 'mp4'
+        'merge_output_format': 'mp4',
+        'quiet': True,
+        'geo_bypass': True
     }
     
     try:
@@ -115,7 +126,7 @@ def download_selected_quality(call):
     except Exception as e:
         bot.send_message(call.message.chat.id, f"صار خطأ أثناء التحميل: {e}")
 
-# نظام البحث السريع (Inline Mode) مع رفع الحد الأقصى للنتائج إلى 50 نتيجة
+# نظام البحث السريع (Inline Mode) مع إعدادات تخطي الحظر وتحديث البحث
 @bot.inline_handler(lambda query: True)
 def inline_search(query):
     text = query.query.strip()
@@ -125,20 +136,27 @@ def inline_search(query):
         results.append(
             InlineQueryResultArticle(
                 id="help",
-                title="🔍 اكتب اسم الكلمة أو رابط البلاي ليست للبحث الموسع",
+                title="🔍 اكتب اسم الكلمة أو رابط البلاي ليست للبحث",
                 input_message_content=InputTextMessageContent("يرجى كتابة الكلمة المطلوبة بعد معرف البوت."),
-                description="مثال: @BotName قرآَن كريم"
+                description="مثال: @tikt0kr_bot اغاني"
             )
         )
         bot.answer_inline_query(query.id, results, cache_time=1)
         return
 
-    ydl_opts = {'format': 'best[ext=mp4]/best', 'extract_flat': True, 'noplaylist': False}
+    # إعدادات متقدمة لتخطي قيود السيرفرات واليوتيوب
+    ydl_opts = {
+        'format': 'best[ext=mp4]/best',
+        'extract_flat': True,
+        'noplaylist': False,
+        'quiet': True,
+        'no_warnings': True,
+        'geo_bypass': True
+    }
     
     try:
         with YoutubeDL(ydl_opts) as ydl:
-            # رفع عدد نتائج البحث المطلوبة من يوتيوب إلى 50 نتيجة (الحد الأقصى لمدى الإنلاين في تليغرام)
-            info = ydl.extract_info(f"ytsearch50:{text}", download=False)
+            info = ydl.extract_info(f"ytsearch25:{text}", download=False)
             entries = info.get('entries', [])
             
         for i, entry in enumerate(entries):
@@ -182,6 +200,7 @@ def inline_search(query):
                 
         bot.answer_inline_query(query.id, results, cache_time=1)
     except Exception as e:
-        print(f"Inline Playlist Error: {e}")
+        print(f"Inline Search Error: {e}")
 
+bot.infinity_permissions = True if hasattr(bot, 'infinity_permissions') else None
 bot.infinity_polling()
